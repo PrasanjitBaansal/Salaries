@@ -7,8 +7,8 @@ from datetime import datetime, timedelta # Ensure timedelta is imported
 # Modules to be tested
 from reporter.database_manager import (
     add_member_to_db, get_all_members, get_db_connection,
-    get_all_plans, add_group_membership_to_db, get_all_activity_for_member, # <- Renamed
-    get_pending_renewals, get_finance_report, add_pt_booking # <- Added add_pt_booking
+    get_all_plans, add_transaction, get_all_activity_for_member,
+    get_pending_renewals, get_finance_report
 )
 # Module needed for setting up test DB
 from reporter.database import create_database, seed_initial_plans
@@ -140,7 +140,7 @@ def test_get_all_members_multiple(db_conn):
         # members list format: (member_id, client_name, phone, join_date)
         assert members[i][1] == expected_name
         assert members[i][2] == original_phone
-        assert members[i][3] is not None # Join date should exist
+        assert members[i][3] is None # Join date should be None if no activity
 
 def test_get_all_plans(db_conn):
     """Tests retrieval of all plans, expecting the seeded default plans."""
@@ -167,8 +167,8 @@ def test_get_all_plans(db_conn):
         assert plans_from_db[i][1] == expected_plan[0], f"Expected plan name '{expected_plan[0]}', got '{plans_from_db[i][1]}'"
         assert plans_from_db[i][2] == expected_plan[1], f"Expected duration '{expected_plan[1]}' for plan '{plans_from_db[i][1]}', got '{plans_from_db[i][2]}'"
 
-def test_add_group_membership(db_conn):
-    """Tests adding a group membership and verifies data including end_date calculation."""
+def test_add_group_class_transaction(db_conn):
+    """Tests adding a group class transaction and verifies data including end_date calculation."""
     # 1. Add a test member
     member_name = "Membership User"
     member_phone = "9998887777"
@@ -193,38 +193,45 @@ def test_add_group_membership(db_conn):
     amount_paid = 75.50
     payment_method = "Credit Card"
 
-    # 4. Call add_group_membership_to_db
-    success = add_group_membership_to_db(
-        member_id, plan_id, payment_date_str, start_date_str, amount_paid, payment_method
+    # 4. Call add_transaction for Group Class
+    success = add_transaction(
+        transaction_type='Group Class',
+        member_id=member_id,
+        plan_id=plan_id,
+        payment_date=payment_date_str,
+        start_date=start_date_str,
+        amount_paid=amount_paid,
+        payment_method=payment_method
     )
-    assert success is True, "add_group_membership_to_db should return True on success."
+    assert success is True, "add_transaction for Group Class should return True on success."
 
     # 5. Verify directly in the database
     cursor.execute(
-        "SELECT member_id, plan_id, payment_date, start_date, end_date, amount_paid, payment_method "
-        "FROM group_memberships WHERE member_id = ?",
-        (member_id,)
+        "SELECT member_id, plan_id, payment_date, start_date, end_date, amount_paid, payment_method, transaction_type "
+        "FROM transactions WHERE member_id = ? AND transaction_type = ?",
+        (member_id, 'Group Class')
     )
-    gm_record = cursor.fetchone()
-    assert gm_record is not None, "Group membership record not found."
+    gc_record = cursor.fetchone()
+    assert gc_record is not None, "Group Class transaction record not found."
 
-    (gm_member_id, gm_plan_id, gm_payment_date, gm_start_date,
-     gm_end_date, gm_amount_paid, gm_payment_method) = gm_record
+    (gc_member_id, gc_plan_id, gc_payment_date, gc_start_date,
+     gc_end_date, gc_amount_paid, gc_payment_method, gc_transaction_type) = gc_record
 
-    assert gm_member_id == member_id
-    assert gm_plan_id == plan_id
-    assert gm_payment_date == payment_date_str
-    assert gm_start_date == start_date_str
-    assert gm_amount_paid == amount_paid
-    assert gm_payment_method == payment_method
+    assert gc_member_id == member_id
+    assert gc_plan_id == plan_id
+    assert gc_payment_date == payment_date_str
+    assert gc_start_date == start_date_str
+    assert gc_amount_paid == amount_paid
+    assert gc_payment_method == payment_method
+    assert gc_transaction_type == 'Group Class'
 
     # Verify end_date calculation
     expected_start_date_obj = datetime.strptime(start_date_str, '%Y-%m-%d')
     expected_end_date_obj = expected_start_date_obj + timedelta(days=plan_duration_days)
     expected_end_date_str = expected_end_date_obj.strftime('%Y-%m-%d')
 
-    assert gm_end_date == expected_end_date_str, \
-        f"End date mismatch. Expected {expected_end_date_str}, got {gm_end_date}."
+    assert gc_end_date == expected_end_date_str, \
+        f"End date mismatch. Expected {expected_end_date_str}, got {gc_end_date}."
 
 # This test is replaced by test_get_all_activity_for_member
 # def test_get_memberships_for_member(db_conn):
@@ -297,8 +304,8 @@ def test_get_memberships_for_member_none(db_conn):
 
 # --- New and Updated Tests ---
 
-def test_add_pt_booking(db_conn):
-    """Tests adding a PT booking and verifies the inserted data."""
+def test_add_personal_training_transaction(db_conn):
+    """Tests adding a Personal Training transaction and verifies the inserted data."""
     # 1. Add a test member
     member_name = "PT User"
     member_phone = "PT123456"
@@ -315,23 +322,32 @@ def test_add_pt_booking(db_conn):
     sessions = 10
     amount_paid = 500.00
 
-    # 3. Call add_pt_booking
-    success = add_pt_booking(member_id, start_date_str, sessions, amount_paid)
-    assert success is True, "add_pt_booking should return True on success."
+    # 3. Call add_transaction for Personal Training
+    success = add_transaction(
+        transaction_type='Personal Training',
+        member_id=member_id,
+        start_date=start_date_str, # payment_date will default to start_date
+        sessions=sessions,
+        amount_paid=amount_paid
+    )
+    assert success is True, "add_transaction for Personal Training should return True on success."
 
     # 4. Verify directly in the database
     cursor.execute(
-        "SELECT member_id, start_date, sessions, amount_paid FROM pt_bookings WHERE member_id = ?",
-        (member_id,)
+        "SELECT member_id, start_date, sessions, amount_paid, transaction_type, plan_id "
+        "FROM transactions WHERE member_id = ? AND transaction_type = ?",
+        (member_id, 'Personal Training')
     )
     pt_record = cursor.fetchone()
-    assert pt_record is not None, "PT booking record not found."
+    assert pt_record is not None, "Personal Training transaction record not found."
 
-    (db_member_id, db_start_date, db_sessions, db_amount_paid) = pt_record
+    (db_member_id, db_start_date, db_sessions, db_amount_paid, db_transaction_type, db_plan_id) = pt_record
     assert db_member_id == member_id
     assert db_start_date == start_date_str
     assert db_sessions == sessions
     assert db_amount_paid == amount_paid
+    assert db_transaction_type == 'Personal Training'
+    assert db_plan_id is None, "plan_id should be None for Personal Training transactions."
 
     # 5. Verify join_date update (as per join_date standardization)
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
@@ -361,19 +377,19 @@ def test_get_all_activity_for_member(db_conn):
     gm_payment_date = "2024-02-10"
     gm_amount = 120.0
     gm_method = "Visa"
-    assert add_group_membership_to_db(member_id, plan_id, gm_payment_date, gm_start_date, gm_amount, gm_method)
+    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=gm_payment_date, start_date=gm_start_date, amount_paid=gm_amount, payment_method=gm_method)
 
     # 4. Add PT Booking
     pt_start_date = "2024-03-05" # Later than GM for ordering
     pt_sessions = 8
     pt_amount = 450.0
-    assert add_pt_booking(member_id, pt_start_date, pt_sessions, pt_amount)
+    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_start_date, sessions=pt_sessions, amount_paid=pt_amount)
 
     # Add another PT Booking with an earlier date to test ordering
     pt_early_start_date = "2024-01-20"
     pt_early_sessions = 5
     pt_early_amount = 300.0
-    assert add_pt_booking(member_id, pt_early_start_date, pt_early_sessions, pt_early_amount)
+    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_early_start_date, sessions=pt_early_sessions, amount_paid=pt_early_amount)
 
 
     # 5. Call get_all_activity_for_member
@@ -484,10 +500,10 @@ def test_get_pending_renewals(db_conn):
     payment_date_p = start_date_p
 
     # 3. Add Group Memberships
-    assert add_group_membership_to_db(member_r1_id, plan_id_30, payment_date_r1, start_date_r1, 50, "CashR1")
-    assert add_group_membership_to_db(member_r2_id, plan_id_30, payment_date_r2, start_date_r2, 50, "CashR2")
-    assert add_group_membership_to_db(member_n_id, plan_id_30, payment_date_n, start_date_n, 50, "CashN")
-    assert add_group_membership_to_db(member_p_id, plan_id_30, payment_date_p, start_date_p, 50, "CashP")
+    assert add_transaction(transaction_type='Group Class', member_id=member_r1_id, plan_id=plan_id_30, payment_date=payment_date_r1, start_date=start_date_r1, amount_paid=50, payment_method="CashR1")
+    assert add_transaction(transaction_type='Group Class', member_id=member_r2_id, plan_id=plan_id_30, payment_date=payment_date_r2, start_date=start_date_r2, amount_paid=50, payment_method="CashR2")
+    assert add_transaction(transaction_type='Group Class', member_id=member_n_id, plan_id=plan_id_30, payment_date=payment_date_n, start_date=start_date_n, amount_paid=50, payment_method="CashN")
+    assert add_transaction(transaction_type='Group Class', member_id=member_p_id, plan_id=plan_id_30, payment_date=payment_date_p, start_date=start_date_p, amount_paid=50, payment_method="CashP")
 
     # 4. Call get_pending_renewals for today's date (current month)
     target_date_for_query = today.strftime('%Y-%m-%d')
@@ -521,13 +537,13 @@ def test_get_pending_renewals_none_for_month(db_conn):
     # Membership ending next month
     next_month_start = (today.replace(day=28) + timedelta(days=4)).replace(day=1)
     start_date_next_month = (next_month_start.replace(day=5) - timedelta(days=plan_30_days[2])).strftime('%Y-%m-%d')
-    assert add_group_membership_to_db(member_id, plan_id_30, start_date_next_month, start_date_next_month, 50, "CashNR")
+    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id_30, payment_date=start_date_next_month, start_date=start_date_next_month, amount_paid=50, payment_method="CashNR")
 
     # Membership ending previous month
     current_month_start = today.replace(day=1)
     last_month_end = current_month_start - timedelta(days=1)
     start_date_prev_month = (last_month_end.replace(day=15) - timedelta(days=plan_30_days[2])).strftime('%Y-%m-%d')
-    assert add_group_membership_to_db(member_id, plan_id_30, start_date_prev_month, start_date_prev_month, 50, "CashNR2")
+    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id_30, payment_date=start_date_prev_month, start_date=start_date_prev_month, amount_paid=50, payment_method="CashNR2")
 
     target_date_for_query = today.strftime('%Y-%m-%d') # Query for current month
     renewals = get_pending_renewals(target_date_for_query)
@@ -576,14 +592,14 @@ def test_get_finance_report(db_conn):
 
     # 3. Add Group Memberships with payments in different months
     # Payments in the previous month
-    assert add_group_membership_to_db(member_f1_id, plan_any[0], pm_date1_str, pm_date1_str, 100.00, "CashFin1")
-    assert add_group_membership_to_db(member_f2_id, plan_any[0], pm_date2_str, pm_date2_str, 50.50, "CardFin2")
+    assert add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=pm_date1_str, start_date=pm_date1_str, amount_paid=100.00, payment_method="CashFin1")
+    assert add_transaction(transaction_type='Group Class', member_id=member_f2_id, plan_id=plan_any[0], payment_date=pm_date2_str, start_date=pm_date2_str, amount_paid=50.50, payment_method="CardFin2")
 
     # Payment in the current month
-    assert add_group_membership_to_db(member_f1_id, plan_any[0], cm_date_str, cm_date_str, 75.00, "CashFin3")
+    assert add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=cm_date_str, start_date=cm_date_str, amount_paid=75.00, payment_method="CashFin3")
 
     # Payment in the month before previous month
-    assert add_group_membership_to_db(member_f3_id, plan_any[0], bpm_date_str, bpm_date_str, 25.00, "CashFin4")
+    assert add_transaction(transaction_type='Group Class', member_id=member_f3_id, plan_id=plan_any[0], payment_date=bpm_date_str, start_date=bpm_date_str, amount_paid=25.00, payment_method="CashFin4")
 
     # 4. Call get_finance_report for the previous month
     total_revenue_prev_month = get_finance_report(prev_year, prev_month)
@@ -645,16 +661,16 @@ def test_get_finance_report_with_pt_bookings(db_conn):
 
     # 3. Add Group Memberships
     # In target month
-    assert add_group_membership_to_db(member_f1_id, plan_any[0], target_month_date1, target_month_date1, 100.00, "GM_Cash1")
+    assert add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=target_month_date1, start_date=target_month_date1, amount_paid=100.00, payment_method="GM_Cash1")
     # Outside target month
-    assert add_group_membership_to_db(member_f2_id, plan_any[0], other_month_date, other_month_date, 50.00, "GM_Cash2")
+    assert add_transaction(transaction_type='Group Class', member_id=member_f2_id, plan_id=plan_any[0], payment_date=other_month_date, start_date=other_month_date, amount_paid=50.00, payment_method="GM_Cash2")
 
     # 4. Add PT Bookings
     # In target month (using start_date as payment recognition date)
-    assert add_pt_booking(member_f1_id, target_month_date2, 10, 200.00) # 200.00
-    assert add_pt_booking(member_f2_id, target_month_date1, 5, 150.00)  # 150.00
+    assert add_transaction(transaction_type='Personal Training', member_id=member_f1_id, start_date=target_month_date2, payment_date=target_month_date2, sessions=10, amount_paid=200.00) # 200.00
+    assert add_transaction(transaction_type='Personal Training', member_id=member_f2_id, start_date=target_month_date1, payment_date=target_month_date1, sessions=5, amount_paid=150.00)  # 150.00
     # Outside target month
-    assert add_pt_booking(member_f1_id, other_month_date, 8, 180.00)
+    assert add_transaction(transaction_type='Personal Training', member_id=member_f1_id, start_date=other_month_date, payment_date=other_month_date, sessions=8, amount_paid=180.00)
 
     # 5. Calculate Expected Total
     # From Group Memberships in target month: 100.00
@@ -680,7 +696,7 @@ def test_join_date_standardization_new_member_then_group_membership(db_conn):
     plans = get_all_plans()
     plan_id = plans[0][0]
     gm_start_date = "2024-04-01"
-    assert add_group_membership_to_db(member_id, plan_id, gm_start_date, gm_start_date, 50, "Cash")
+    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=gm_start_date, start_date=gm_start_date, amount_paid=50, payment_method="Cash")
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     updated_join_date = cursor.fetchone()[0]
@@ -698,7 +714,7 @@ def test_join_date_standardization_new_member_then_pt_booking(db_conn):
     assert initial_join_date is None, "Join date should be NULL on initial member add."
 
     pt_start_date = "2024-05-10"
-    assert add_pt_booking(member_id, pt_start_date, 10, 300)
+    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_start_date, payment_date=pt_start_date, sessions=10, amount_paid=300)
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     updated_join_date = cursor.fetchone()[0]
@@ -716,7 +732,7 @@ def test_join_date_standardization_existing_member_earlier_activity(db_conn):
     member_id = cursor.fetchone()[0]
 
     initial_activity_date = "2023-03-15"
-    assert add_pt_booking(member_id, initial_activity_date, 5, 250) # This will set join_date to 2023-03-15
+    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=initial_activity_date, payment_date=initial_activity_date, sessions=5, amount_paid=250) # This will set join_date to 2023-03-15
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     current_join_date = cursor.fetchone()[0]
@@ -726,7 +742,7 @@ def test_join_date_standardization_existing_member_earlier_activity(db_conn):
     plans = get_all_plans()
     plan_id = plans[0][0]
     earlier_gm_start_date = "2023-03-01"
-    assert add_group_membership_to_db(member_id, plan_id, earlier_gm_start_date, earlier_gm_start_date, 50, "Cash")
+    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=earlier_gm_start_date, start_date=earlier_gm_start_date, amount_paid=50, payment_method="Cash")
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     updated_join_date = cursor.fetchone()[0]
@@ -744,7 +760,7 @@ def test_join_date_standardization_existing_member_later_activity(db_conn):
     initial_activity_date = "2023-04-01"
     plans = get_all_plans()
     plan_id = plans[0][0]
-    assert add_group_membership_to_db(member_id, plan_id, initial_activity_date, initial_activity_date, 60, "Card") # Sets join_date
+    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=initial_activity_date, start_date=initial_activity_date, amount_paid=60, payment_method="Card") # Sets join_date
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     current_join_date = cursor.fetchone()[0]
@@ -752,7 +768,7 @@ def test_join_date_standardization_existing_member_later_activity(db_conn):
 
     # Add a PT booking with a later start date
     later_pt_start_date = "2023-04-10"
-    assert add_pt_booking(member_id, later_pt_start_date, 8, 280)
+    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=later_pt_start_date, payment_date=later_pt_start_date, sessions=8, amount_paid=280)
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     final_join_date = cursor.fetchone()[0]

@@ -27,6 +27,12 @@ def add_member_to_db(name: str, phone: str, join_date: str = None) -> bool:
     Returns:
         bool: True if the member was added successfully, False otherwise.
     """
+    if not name or not isinstance(name, str) or name.strip() == "":
+        print("Error: Member name cannot be empty.")
+        return False
+    if not phone or not isinstance(phone, str) or phone.strip() == "":
+        print("Error: Member phone number cannot be empty.")
+        return False
     conn = None
     try:
         conn = get_db_connection()
@@ -136,6 +142,9 @@ def add_plan(name: str, duration_days: int, is_active: bool = True) -> int | Non
     Returns:
         int | None: The ID of the newly added plan, or None if an error occurs.
     """
+    if not isinstance(duration_days, int) or duration_days <= 0:
+        print("Error: Plan duration must be a positive integer.")
+        return None
     conn = None
     try:
         conn = get_db_connection()
@@ -276,6 +285,12 @@ def add_transaction(transaction_type: str, member_id: int, start_date: str, amou
     Returns:
         bool: True if successful, False otherwise.
     """
+    if amount_paid <= 0:
+        print("Error: Amount paid must be a positive number.")
+        return False
+    if transaction_type == 'Personal Training' and sessions is not None and sessions <= 0:
+        print("Error: Number of sessions for Personal Training must be a positive number.")
+        return False
     conn = None
     try:
         conn = get_db_connection()
