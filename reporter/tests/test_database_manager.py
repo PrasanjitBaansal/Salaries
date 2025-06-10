@@ -70,8 +70,8 @@ def test_add_member_successful(db_conn):
     name = "Test User"
     phone = "1234567890"
 
-    success = add_member_to_db(name, phone)
-    assert success is True, "add_member_to_db should return True on success."
+    success, message = add_member_to_db(name, phone)
+    assert success is True, f"add_member_to_db should return True on success. Message: {message}"
 
     # Verify directly in the database
     cursor = db_conn.cursor()
@@ -93,13 +93,13 @@ def test_add_member_duplicate_phone(db_conn):
     name1 = "Test User1"
     phone = "1112223333" # Unique phone for this test
 
-    success1 = add_member_to_db(name1, phone)
-    assert success1 is True, "First member addition should be successful."
+    success1, message1 = add_member_to_db(name1, phone)
+    assert success1 is True, f"First member addition should be successful. Message: {message1}"
 
     name2 = "Test User2"
     # Attempt to add another member with the same phone number
-    success2 = add_member_to_db(name2, phone)
-    assert success2 is False, "Second member addition with duplicate phone should fail and return False."
+    success2, message2 = add_member_to_db(name2, phone)
+    assert success2 is False, f"Second member addition with duplicate phone should fail and return False. Message: {message2}"
 
     # Verify that only the first member was added
     cursor = db_conn.cursor()
@@ -123,7 +123,8 @@ def test_get_all_members_multiple(db_conn):
     ]
 
     for name, phone in member_data:
-        assert add_member_to_db(name, phone) is True, f"Failed to add member {name}"
+        success, message = add_member_to_db(name, phone)
+        assert success is True, f"Failed to add member {name}. Message: {message}"
 
     members = get_all_members()
     assert len(members) == len(member_data), f"Expected {len(member_data)} members, got {len(members)}."
@@ -163,7 +164,8 @@ def test_get_all_members_filter_by_name(db_conn):
         ("John Smith", "7778889999")
     ]
     for name, phone in member_data:
-        assert add_member_to_db(name, phone) is True
+        success, message = add_member_to_db(name, phone)
+        assert success is True, f"Failed to add member {name}. Message: {message}"
 
     # Filter by full name
     members = get_all_members(name_filter="John Doe")
@@ -189,7 +191,8 @@ def test_get_all_members_filter_by_phone(db_conn):
         ("User Three", "1230000000")
     ]
     for name, phone in member_data:
-        assert add_member_to_db(name, phone) is True
+        success, message = add_member_to_db(name, phone)
+        assert success is True, f"Failed to add member {name}. Message: {message}"
 
     # Filter by full phone number
     members = get_all_members(phone_filter="1234567890")
@@ -215,7 +218,8 @@ def test_get_all_members_filter_by_name_and_phone(db_conn):
         ("Alice Smith", "1117778888")
     ]
     for name, phone in member_data:
-        assert add_member_to_db(name, phone) is True
+        success, message = add_member_to_db(name, phone)
+        assert success is True, f"Failed to add member {name}. Message: {message}"
 
     # Filter by name and phone (exact match)
     members = get_all_members(name_filter="Alice Johnson", phone_filter="1112223333")
@@ -302,9 +306,11 @@ def test_get_all_plans_with_inactive_only_inactive(db_conn):
     db_conn.commit()
 
     # Add some inactive plans
-    plan_id1 = add_plan("Inactive Plan 1", 10, is_active=False)
-    plan_id2 = add_plan("Inactive Plan 2", 20, is_active=False)
+    add_plan_success1, add_plan_message1, plan_id1 = add_plan("Inactive Plan 1", 10, is_active=False)
+    add_plan_success2, add_plan_message2, plan_id2 = add_plan("Inactive Plan 2", 20, is_active=False)
+    assert add_plan_success1 is True, f"Failed to add plan. Message: {add_plan_message1}"
     assert plan_id1 is not None
+    assert add_plan_success2 is True, f"Failed to add plan. Message: {add_plan_message2}"
     assert plan_id2 is not None
 
     plans = get_all_plans_with_inactive()
@@ -319,9 +325,12 @@ def test_get_all_plans_with_inactive_mixed(db_conn):
     db_conn.commit()
 
     # Add plans
-    add_plan("Active Plan Mix", 30, is_active=True)
-    add_plan("Inactive Plan Mix", 60, is_active=False)
-    add_plan("Another Active Mix", 90, is_active=True)
+    add_plan_success1, add_plan_message1, _ = add_plan("Active Plan Mix", 30, is_active=True)
+    assert add_plan_success1 is True, f"Failed to add plan. Message: {add_plan_message1}"
+    add_plan_success2, add_plan_message2, _ = add_plan("Inactive Plan Mix", 60, is_active=False)
+    assert add_plan_success2 is True, f"Failed to add plan. Message: {add_plan_message2}"
+    add_plan_success3, add_plan_message3, _ = add_plan("Another Active Mix", 90, is_active=True)
+    assert add_plan_success3 is True, f"Failed to add plan. Message: {add_plan_message3}"
 
     plans = get_all_plans_with_inactive()
     assert len(plans) == 3
@@ -411,7 +420,8 @@ def test_add_transaction_group_class(db_conn):
     # 1. Add a test member
     member_name = "Membership User"
     member_phone = "9998887777"
-    assert add_member_to_db(member_name, member_phone) is True
+    success_add_member, message_add_member = add_member_to_db(member_name, member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
@@ -434,7 +444,7 @@ def test_add_transaction_group_class(db_conn):
     payment_method = "Credit Card"
 
     # 4. Call add_transaction for a 'Group Class' with explicit end_date
-    success = add_transaction(
+    success, message = add_transaction(
         transaction_type='Group Class',
         member_id=member_id,
         plan_id=plan_id,
@@ -444,7 +454,7 @@ def test_add_transaction_group_class(db_conn):
         amount_paid=amount_paid,
         payment_method=payment_method
     )
-    assert success[0] is True, "add_transaction for Group Class should return True on success."
+    assert success is True, f"add_transaction for Group Class should return True on success. Message: {message}"
 
     # 5. Verify directly in the database (transactions table)
     # Note: Fields will differ from the old group_memberships table
@@ -529,8 +539,8 @@ def test_add_transaction_group_class(db_conn):
 
 def test_get_memberships_for_member_none(db_conn):
     """Tests retrieving memberships for a member who has none."""
-    member_c_id_success = add_member_to_db("Member C NoHistory", "3003003003")
-    assert member_c_id_success is True
+    member_c_id_success, message = add_member_to_db("Member C NoHistory", "3003003003")
+    assert member_c_id_success is True, f"Failed to add member. Message: {message}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = '3003003003'")
@@ -547,7 +557,8 @@ def test_add_transaction_group_class_invalid_plan_id(db_conn):
     # 1. Add a test member
     member_name = "Transaction Test User"
     member_phone = "TRX001"
-    assert add_member_to_db(member_name, member_phone) is True
+    success_add_member, message_add_member = add_member_to_db(member_name, member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
     member_id = cursor.fetchone()[0]
@@ -559,7 +570,7 @@ def test_add_transaction_group_class_invalid_plan_id(db_conn):
     amount_paid = 50.00
     payment_method = "Cash"
 
-    success = add_transaction(
+    success, message = add_transaction(
         transaction_type='Group Class',
         member_id=member_id,
         plan_id=invalid_plan_id,
@@ -569,7 +580,7 @@ def test_add_transaction_group_class_invalid_plan_id(db_conn):
         payment_method=payment_method
     )
     # The function add_transaction is expected to print an error and return False
-    assert success[0] is False, "add_transaction should return False for an invalid plan_id."
+    assert success is False, f"add_transaction should return False for an invalid plan_id. Message: {message}"
 
     # Verify no transaction was actually added
     cursor.execute("SELECT COUNT(*) FROM transactions WHERE member_id = ?", (member_id,))
@@ -582,7 +593,8 @@ def test_add_transaction_personal_training(db_conn):
     # 1. Add a test member
     member_name = "PT User"
     member_phone = "PT123456"
-    assert add_member_to_db(member_name, member_phone) is True
+    success_add_member, message_add_member = add_member_to_db(member_name, member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
@@ -597,7 +609,7 @@ def test_add_transaction_personal_training(db_conn):
     amount_paid = 500.00
 
     # 3. Call add_transaction for 'Personal Training' with explicit end_date
-    success = add_transaction(
+    success, message = add_transaction(
         transaction_type='Personal Training',
         member_id=member_id,
         start_date=start_date_str, # payment_date will default to start_date
@@ -605,7 +617,7 @@ def test_add_transaction_personal_training(db_conn):
         amount_paid=amount_paid,
         sessions=sessions
     )
-    assert success[0] is True, "add_transaction for PT should return True on success."
+    assert success is True, f"add_transaction for PT should return True on success. Message: {message}"
 
     # 4. Verify directly in the database (transactions table)
     cursor.execute(
@@ -634,7 +646,8 @@ def test_get_all_activity_for_member(db_conn):
     # 1. Add Member
     member_name = "Activity User"
     member_phone = "ACT001"
-    assert add_member_to_db(member_name, member_phone) is True
+    success_add_member, message_add_member = add_member_to_db(member_name, member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
     member_id = cursor.fetchone()[0]
@@ -651,19 +664,22 @@ def test_get_all_activity_for_member(db_conn):
     gm_payment_date = "2024-02-10"
     gm_amount = 120.0
     gm_method = "Visa"
-    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=gm_payment_date, start_date=gm_start_date, amount_paid=gm_amount, payment_method=gm_method)
+    success_gm, message_gm = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=gm_payment_date, start_date=gm_start_date, amount_paid=gm_amount, payment_method=gm_method)
+    assert success_gm is True, f"Failed to add group membership. Message: {message_gm}"
 
     # 4. Add PT Booking
     pt_start_date = "2024-03-05" # Later than GM for ordering
     pt_sessions = 8
     pt_amount = 450.0
-    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_start_date, sessions=pt_sessions, amount_paid=pt_amount)
+    success_pt1, message_pt1 = add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_start_date, sessions=pt_sessions, amount_paid=pt_amount)
+    assert success_pt1 is True, f"Failed to add PT booking. Message: {message_pt1}"
 
     # Add another PT Booking with an earlier date to test ordering
     pt_early_start_date = "2024-01-20"
     pt_early_sessions = 5
     pt_early_amount = 300.0
-    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_early_start_date, sessions=pt_early_sessions, amount_paid=pt_early_amount)
+    success_pt2, message_pt2 = add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_early_start_date, sessions=pt_early_sessions, amount_paid=pt_early_amount)
+    assert success_pt2 is True, f"Failed to add early PT booking. Message: {message_pt2}"
 
 
     # 5. Call get_all_activity_for_member
@@ -729,7 +745,8 @@ def test_get_pending_renewals(db_conn):
         "User E": {"phone": "P001", "id": None, "name": "User E"}  # Will be in the past
     }
     for name, data in member_data.items():
-        assert add_member_to_db(name, data["phone"]) is True
+        success_add_member, message_add_member = add_member_to_db(name, data["phone"])
+        assert success_add_member is True, f"Failed to add member {name}. Message: {message_add_member}"
         cursor.execute("SELECT member_id FROM members WHERE phone = ?", (data["phone"],))
         member_data[name]["id"] = cursor.fetchone()[0]
 
@@ -777,7 +794,7 @@ def test_get_pending_renewals(db_conn):
 
     for member_info, end_date_str, should_be_included in transactions_data:
         # Add the transaction that might be a renewal
-        add_transaction_success, msg = add_transaction(
+        success_txn, message_txn = add_transaction(
             transaction_type='Group Class', # get_pending_renewals filters for this type
             member_id=member_info["id"],
             plan_id=plan_id,
@@ -787,7 +804,7 @@ def test_get_pending_renewals(db_conn):
             amount_paid=50,
             payment_method="CashTest"
         )
-        assert add_transaction_success, f"Failed to add transaction for {member_info['name']} ending {end_date_str}. Error: {msg}"
+        assert success_txn, f"Failed to add transaction for {member_info['name']} ending {end_date_str}. Error: {message_txn}"
 
         if should_be_included:
             expected_renewals_details.append({
@@ -822,7 +839,8 @@ def test_get_pending_renewals_none_when_no_relevant_data(db_conn):
     db_conn.commit()
 
     # Add one member and one plan
-    assert add_member_to_db("Test User No Renew", "TNR001")
+    success_add_member, message_add_member = add_member_to_db("Test User No Renew", "TNR001")
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor.execute("SELECT member_id FROM members WHERE phone = 'TNR001'")
     member_id = cursor.fetchone()[0]
 
@@ -833,11 +851,13 @@ def test_get_pending_renewals_none_when_no_relevant_data(db_conn):
 
     # Transaction ending far in the future
     end_date_future = (today_obj + timedelta(days=100)).strftime('%Y-%m-%d')
-    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=today_obj.strftime('%Y-%m-%d'), start_date=today_obj.strftime('%Y-%m-%d'), end_date=end_date_future, amount_paid=50)
+    success_txn1, message_txn1 = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=today_obj.strftime('%Y-%m-%d'), start_date=today_obj.strftime('%Y-%m-%d'), end_date=end_date_future, amount_paid=50)
+    assert success_txn1 is True, f"Failed to add future transaction. Message: {message_txn1}"
 
     # Transaction ending in the past
     end_date_past = (today_obj - timedelta(days=100)).strftime('%Y-%m-%d')
-    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=today_obj.strftime('%Y-%m-%d'), start_date=today_obj.strftime('%Y-%m-%d'), end_date=end_date_past, amount_paid=50)
+    success_txn2, message_txn2 = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=today_obj.strftime('%Y-%m-%d'), start_date=today_obj.strftime('%Y-%m-%d'), end_date=end_date_past, amount_paid=50)
+    assert success_txn2 is True, f"Failed to add past transaction. Message: {message_txn2}"
 
     # Call with a year and month guaranteed to have no data from the setup
     renewals = get_pending_renewals(year=1900, month=1)
@@ -847,12 +867,12 @@ def test_get_pending_renewals_none_when_no_relevant_data(db_conn):
 def test_get_finance_report(db_conn):
     """Tests calculation of total revenue for a specific month."""
     # 1. Add Members and Plans
-    member_f1_id = add_member_to_db("Finance User1", "F001")
-    assert member_f1_id is True
-    member_f2_id = add_member_to_db("Finance User2", "F002")
-    assert member_f2_id is True
-    member_f3_id = add_member_to_db("Finance User3", "F003")
-    assert member_f3_id is True
+    success_add_member1, message_add_member1 = add_member_to_db("Finance User1", "F001")
+    assert success_add_member1 is True, f"Failed to add member. Message: {message_add_member1}"
+    success_add_member2, message_add_member2 = add_member_to_db("Finance User2", "F002")
+    assert success_add_member2 is True, f"Failed to add member. Message: {message_add_member2}"
+    success_add_member3, message_add_member3 = add_member_to_db("Finance User3", "F003")
+    assert success_add_member3 is True, f"Failed to add member. Message: {message_add_member3}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = 'F001'")
@@ -886,14 +906,18 @@ def test_get_finance_report(db_conn):
 
     # 3. Add Group Memberships with payments in different months (as Transactions)
     # Payments in the previous month
-    assert add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=pm_date1_str, start_date=pm_date1_str, amount_paid=100.00, payment_method="CashFin1")
-    assert add_transaction(transaction_type='Group Class', member_id=member_f2_id, plan_id=plan_any[0], payment_date=pm_date2_str, start_date=pm_date2_str, amount_paid=50.50, payment_method="CardFin2")
+    success_txn1, message_txn1 = add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=pm_date1_str, start_date=pm_date1_str, amount_paid=100.00, payment_method="CashFin1")
+    assert success_txn1 is True, f"Failed to add transaction. Message: {message_txn1}"
+    success_txn2, message_txn2 = add_transaction(transaction_type='Group Class', member_id=member_f2_id, plan_id=plan_any[0], payment_date=pm_date2_str, start_date=pm_date2_str, amount_paid=50.50, payment_method="CardFin2")
+    assert success_txn2 is True, f"Failed to add transaction. Message: {message_txn2}"
 
     # Payment in the current month
-    assert add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=cm_date_str, start_date=cm_date_str, amount_paid=75.00, payment_method="CashFin3")
+    success_txn3, message_txn3 = add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=cm_date_str, start_date=cm_date_str, amount_paid=75.00, payment_method="CashFin3")
+    assert success_txn3 is True, f"Failed to add transaction. Message: {message_txn3}"
 
     # Payment in the month before previous month
-    assert add_transaction(transaction_type='Group Class', member_id=member_f3_id, plan_id=plan_any[0], payment_date=bpm_date_str, start_date=bpm_date_str, amount_paid=25.00, payment_method="CashFin4")
+    success_txn4, message_txn4 = add_transaction(transaction_type='Group Class', member_id=member_f3_id, plan_id=plan_any[0], payment_date=bpm_date_str, start_date=bpm_date_str, amount_paid=25.00, payment_method="CashFin4")
+    assert success_txn4 is True, f"Failed to add transaction. Message: {message_txn4}"
 
     # 4. Call get_finance_report for the previous month
     total_revenue_prev_month = get_finance_report(prev_year, prev_month)
@@ -927,10 +951,10 @@ def test_get_finance_report_no_transactions(db_conn):
 def test_get_finance_report_with_pt_bookings(db_conn):
     """Tests get_finance_report including revenue from PT bookings."""
     # 1. Add Members and Plans
-    member_f1_id = add_member_to_db("Finance User PT1", "FPT001")
-    assert member_f1_id is True
-    member_f2_id = add_member_to_db("Finance User PT2", "FPT002")
-    assert member_f2_id is True
+    success_add_member1, message_add_member1 = add_member_to_db("Finance User PT1", "FPT001")
+    assert success_add_member1 is True, f"Failed to add member. Message: {message_add_member1}"
+    success_add_member2, message_add_member2 = add_member_to_db("Finance User PT2", "FPT002")
+    assert success_add_member2 is True, f"Failed to add member. Message: {message_add_member2}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = 'FPT001'")
@@ -955,16 +979,21 @@ def test_get_finance_report_with_pt_bookings(db_conn):
 
     # 3. Add Group Memberships (as Transactions)
     # In target month
-    assert add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=target_month_date1, start_date=target_month_date1, amount_paid=100.00, payment_method="GM_Cash1")
+    success_txn1, message_txn1 = add_transaction(transaction_type='Group Class', member_id=member_f1_id, plan_id=plan_any[0], payment_date=target_month_date1, start_date=target_month_date1, amount_paid=100.00, payment_method="GM_Cash1")
+    assert success_txn1 is True, f"Failed to add transaction. Message: {message_txn1}"
     # Outside target month
-    assert add_transaction(transaction_type='Group Class', member_id=member_f2_id, plan_id=plan_any[0], payment_date=other_month_date, start_date=other_month_date, amount_paid=50.00, payment_method="GM_Cash2")
+    success_txn2, message_txn2 = add_transaction(transaction_type='Group Class', member_id=member_f2_id, plan_id=plan_any[0], payment_date=other_month_date, start_date=other_month_date, amount_paid=50.00, payment_method="GM_Cash2")
+    assert success_txn2 is True, f"Failed to add transaction. Message: {message_txn2}"
 
     # 4. Add PT Bookings (as Transactions)
     # In target month (using start_date as payment recognition date for PT, payment_date for transaction table)
-    assert add_transaction(transaction_type='Personal Training', member_id=member_f1_id, payment_date=target_month_date2, start_date=target_month_date2, sessions=10, amount_paid=200.00) # 200.00
-    assert add_transaction(transaction_type='Personal Training', member_id=member_f2_id, payment_date=target_month_date1, start_date=target_month_date1, sessions=5, amount_paid=150.00)  # 150.00
+    success_txn3, message_txn3 = add_transaction(transaction_type='Personal Training', member_id=member_f1_id, payment_date=target_month_date2, start_date=target_month_date2, sessions=10, amount_paid=200.00) # 200.00
+    assert success_txn3 is True, f"Failed to add transaction. Message: {message_txn3}"
+    success_txn4, message_txn4 = add_transaction(transaction_type='Personal Training', member_id=member_f2_id, payment_date=target_month_date1, start_date=target_month_date1, sessions=5, amount_paid=150.00)  # 150.00
+    assert success_txn4 is True, f"Failed to add transaction. Message: {message_txn4}"
     # Outside target month
-    assert add_transaction(transaction_type='Personal Training', member_id=member_f1_id, payment_date=other_month_date, start_date=other_month_date, sessions=8, amount_paid=180.00)
+    success_txn5, message_txn5 = add_transaction(transaction_type='Personal Training', member_id=member_f1_id, payment_date=other_month_date, start_date=other_month_date, sessions=8, amount_paid=180.00)
+    assert success_txn5 is True, f"Failed to add transaction. Message: {message_txn5}"
 
     # 5. Calculate Expected Total
     # From Group Memberships in target month: 100.00
@@ -980,7 +1009,8 @@ def test_get_finance_report_with_pt_bookings(db_conn):
 def test_join_date_standardization_new_member_then_group_membership(db_conn):
     """Scenario 1: New member, then group membership. Join date becomes GM start date."""
     member_phone = "JD_GM01"
-    assert add_member_to_db("JoinDate User GM", member_phone) is True
+    success_add_member, message_add_member = add_member_to_db("JoinDate User GM", member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id, join_date FROM members WHERE phone = ?", (member_phone,))
@@ -990,7 +1020,8 @@ def test_join_date_standardization_new_member_then_group_membership(db_conn):
     plans = get_all_plans()
     plan_id = plans[0][0]
     gm_start_date = "2024-04-01"
-    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=gm_start_date, start_date=gm_start_date, amount_paid=50, payment_method="Cash")
+    success_txn, message_txn = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=gm_start_date, start_date=gm_start_date, amount_paid=50, payment_method="Cash")
+    assert success_txn is True, f"Failed to add transaction. Message: {message_txn}"
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     updated_join_date = cursor.fetchone()[0]
@@ -1000,7 +1031,8 @@ def test_join_date_standardization_new_member_then_group_membership(db_conn):
 def test_join_date_standardization_new_member_then_pt_booking(db_conn):
     """Scenario 2: New member, then PT booking. Join date becomes PT start date."""
     member_phone = "JD_PT01"
-    assert add_member_to_db("JoinDate User PT", member_phone) is True
+    success_add_member, message_add_member = add_member_to_db("JoinDate User PT", member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id, join_date FROM members WHERE phone = ?", (member_phone,))
@@ -1008,7 +1040,8 @@ def test_join_date_standardization_new_member_then_pt_booking(db_conn):
     assert initial_join_date is None, "Join date should be NULL on initial member add."
 
     pt_start_date = "2024-05-10"
-    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_start_date, sessions=10, amount_paid=300)
+    success_txn, message_txn = add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=pt_start_date, sessions=10, amount_paid=300)
+    assert success_txn is True, f"Failed to add transaction. Message: {message_txn}"
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     updated_join_date = cursor.fetchone()[0]
@@ -1020,13 +1053,15 @@ def test_join_date_standardization_existing_member_earlier_activity(db_conn):
     member_phone = "JD_EARLY01"
     # Add member with an initial join_date (e.g. from a hypothetical import or older logic)
     # For this test, let's simulate it by first adding a PT booking
-    assert add_member_to_db("JoinDate User Early", member_phone) is True
+    success_add_member, message_add_member = add_member_to_db("JoinDate User Early", member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
     member_id = cursor.fetchone()[0]
 
     initial_activity_date = "2023-03-15"
-    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=initial_activity_date, sessions=5, amount_paid=250) # This will set join_date to 2023-03-15
+    success_txn1, message_txn1 = add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=initial_activity_date, sessions=5, amount_paid=250) # This will set join_date to 2023-03-15
+    assert success_txn1 is True, f"Failed to add initial transaction. Message: {message_txn1}"
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     current_join_date = cursor.fetchone()[0]
@@ -1036,7 +1071,8 @@ def test_join_date_standardization_existing_member_earlier_activity(db_conn):
     plans = get_all_plans()
     plan_id = plans[0][0]
     earlier_gm_start_date = "2023-03-01"
-    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=earlier_gm_start_date, start_date=earlier_gm_start_date, amount_paid=50, payment_method="Cash")
+    success_txn2, message_txn2 = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=earlier_gm_start_date, start_date=earlier_gm_start_date, amount_paid=50, payment_method="Cash")
+    assert success_txn2 is True, f"Failed to add earlier transaction. Message: {message_txn2}"
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     updated_join_date = cursor.fetchone()[0]
@@ -1046,7 +1082,8 @@ def test_join_date_standardization_existing_member_earlier_activity(db_conn):
 def test_join_date_standardization_existing_member_later_activity(db_conn):
     """Scenario 4: Existing member, new activity later than current join_date."""
     member_phone = "JD_LATER01"
-    assert add_member_to_db("JoinDate User Later", member_phone) is True
+    success_add_member, message_add_member = add_member_to_db("JoinDate User Later", member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
     member_id = cursor.fetchone()[0]
@@ -1054,7 +1091,8 @@ def test_join_date_standardization_existing_member_later_activity(db_conn):
     initial_activity_date = "2023-04-01"
     plans = get_all_plans()
     plan_id = plans[0][0]
-    assert add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=initial_activity_date, start_date=initial_activity_date, amount_paid=60, payment_method="Card") # Sets join_date
+    success_txn1, message_txn1 = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id, payment_date=initial_activity_date, start_date=initial_activity_date, amount_paid=60, payment_method="Card") # Sets join_date
+    assert success_txn1 is True, f"Failed to add initial transaction. Message: {message_txn1}"
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     current_join_date = cursor.fetchone()[0]
@@ -1062,7 +1100,8 @@ def test_join_date_standardization_existing_member_later_activity(db_conn):
 
     # Add a PT booking with a later start date
     later_pt_start_date = "2023-04-10"
-    assert add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=later_pt_start_date, sessions=8, amount_paid=280)
+    success_txn2, message_txn2 = add_transaction(transaction_type='Personal Training', member_id=member_id, start_date=later_pt_start_date, sessions=8, amount_paid=280)
+    assert success_txn2 is True, f"Failed to add later transaction. Message: {message_txn2}"
 
     cursor.execute("SELECT join_date FROM members WHERE member_id = ?", (member_id,))
     final_join_date = cursor.fetchone()[0]
@@ -1076,7 +1115,8 @@ def test_deactivate_member(db_conn):
     # 1. Add a member
     member_name = "Member to Deactivate"
     member_phone = "DEACT001"
-    assert add_member_to_db(member_name, member_phone) is True
+    success_add_member, message_add_member = add_member_to_db(member_name, member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
     member_id_row = cursor.fetchone()
@@ -1089,10 +1129,12 @@ def test_deactivate_member(db_conn):
     plan_id = plans[0][0]
     initial_number_of_transactions_added = 2
 
-    add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id,
+    success_txn1, message_txn1 = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id,
                     payment_date="2024-01-01", start_date="2024-01-01", amount_paid=50, payment_method="Cash")
-    add_transaction(transaction_type='Personal Training', member_id=member_id, start_date="2024-01-05",
+    assert success_txn1 is True, f"Failed to add transaction. Message: {message_txn1}"
+    success_txn2, message_txn2 = add_transaction(transaction_type='Personal Training', member_id=member_id, start_date="2024-01-05",
                     sessions=5, amount_paid=100)
+    assert success_txn2 is True, f"Failed to add transaction. Message: {message_txn2}"
 
     # Verify transactions were added
     cursor.execute("SELECT COUNT(*) FROM transactions WHERE member_id = ?", (member_id,))
@@ -1124,7 +1166,8 @@ def test_delete_transaction(db_conn):
     # 1. Add a member
     member_name = "Transaction Test Member"
     member_phone = "TRXDEL001"
-    assert add_member_to_db(member_name, member_phone) is True
+    success_add_member, message_add_member = add_member_to_db(member_name, member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor = db_conn.cursor()
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
     member_id_row = cursor.fetchone()
@@ -1134,8 +1177,9 @@ def test_delete_transaction(db_conn):
     # 2. Add a transaction for the member
     plans = get_all_plans()
     plan_id = plans[0][0]
-    add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id,
+    success_txn1, message_txn1 = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id,
                     payment_date="2024-02-01", start_date="2024-02-01", amount_paid=60, payment_method="Card")
+    assert success_txn1 is True, f"Failed to add transaction. Message: {message_txn1}"
 
     # Get the transaction_id of the added transaction
     cursor.execute("SELECT transaction_id FROM transactions WHERE member_id = ? ORDER BY transaction_id DESC LIMIT 1", (member_id,)) # Get the last one
@@ -1144,8 +1188,9 @@ def test_delete_transaction(db_conn):
     transaction_id_to_delete = transaction_id_row[0]
 
     # Add a second transaction to ensure only the specific one is deleted
-    add_transaction(transaction_type='Personal Training', member_id=member_id, start_date="2024-02-05",
+    success_txn2, message_txn2 = add_transaction(transaction_type='Personal Training', member_id=member_id, start_date="2024-02-05",
                     sessions=3, amount_paid=70)
+    assert success_txn2 is True, f"Failed to add transaction. Message: {message_txn2}"
 
     cursor.execute("SELECT transaction_id FROM transactions WHERE member_id = ? AND transaction_type = 'Personal Training'", (member_id,))
     other_transaction_id_row = cursor.fetchone()
@@ -1181,44 +1226,48 @@ def test_delete_plan(db_conn):
     plan_name_unused = "Temporary Test Plan Unused"
     plan_duration_unused = 15
     # Use add_plan from database_manager, not direct SQL, to ensure consistency
-    unused_plan_id = add_plan(plan_name_unused, plan_duration_unused, is_active=True)
-    assert unused_plan_id is not None, "Failed to add unused plan for deletion test."
+    success_add_unused, message_add_unused, plan_id_unused_val = add_plan(plan_name_unused, plan_duration_unused, is_active=True)
+    assert success_add_unused is True, f"Failed to add unused plan. Message: {message_add_unused}"
+    assert plan_id_unused_val is not None, "Failed to get plan_id for unused plan."
 
-    result_unused, message_unused = delete_plan(unused_plan_id)
-    assert result_unused is True, "delete_plan should return True for unused plan."
+    result_unused, message_unused = delete_plan(plan_id_unused_val)
+    assert result_unused is True, f"delete_plan should return True for unused plan. Expected True. Message: {message_unused}"
     assert message_unused == "Plan deleted successfully.", f"Unexpected message: {message_unused}"
 
-    cursor.execute("SELECT * FROM plans WHERE plan_id = ?", (unused_plan_id,))
+    cursor.execute("SELECT * FROM plans WHERE plan_id = ?", (plan_id_unused_val,))
     assert cursor.fetchone() is None, "Unused plan was not actually deleted from the database."
 
     # Scenario 2: Attempt to delete a plan that is in use
     plan_name_used = "Temporary Test Plan Used"
     plan_duration_used = 45
-    used_plan_id = add_plan(plan_name_used, plan_duration_used, is_active=True)
-    assert used_plan_id is not None, "Failed to add used plan for deletion test."
+    success_add_used, message_add_used, plan_id_used_val = add_plan(plan_name_used, plan_duration_used, is_active=True)
+    assert success_add_used is True, f"Failed to add used plan. Message: {message_add_used}"
+    assert plan_id_used_val is not None, "Failed to get plan_id for used plan."
 
     # Add a member and a transaction linking to this plan
     member_name = "Plan User"
     member_phone = "PLANUSER01"
-    assert add_member_to_db(member_name, member_phone) is True
+    success_add_member, message_add_member = add_member_to_db(member_name, member_phone)
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
     member_id_row = cursor.fetchone()
     assert member_id_row is not None
     member_id = member_id_row[0]
 
-    add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=used_plan_id,
+    success_txn, message_txn = add_transaction(transaction_type='Group Class', member_id=member_id, plan_id=plan_id_used_val,
                     payment_date="2024-03-01", start_date="2024-03-01", amount_paid=80, payment_method="Online")
+    assert success_txn is True, f"Failed to add transaction. Message: {message_txn}"
 
-    result_used, message_used = delete_plan(used_plan_id)
-    assert result_used is False, "delete_plan should return False for a plan in use."
+    result_used, message_used = delete_plan(plan_id_used_val)
+    assert result_used is False, f"delete_plan should return False for a plan in use. Expected False. Message: {message_used}"
     assert message_used == "Plan is in use and cannot be deleted.", f"Unexpected message: {message_used}" # Corrected message
 
     # Verify the plan was NOT deleted
-    cursor.execute("SELECT * FROM plans WHERE plan_id = ?", (used_plan_id,))
+    cursor.execute("SELECT * FROM plans WHERE plan_id = ?", (plan_id_used_val,))
     assert cursor.fetchone() is not None, "Used plan was deleted, but it shouldn't have been."
 
     # Verify the transaction linking to the plan still exists
-    cursor.execute("SELECT COUNT(*) FROM transactions WHERE plan_id = ?", (used_plan_id,))
+    cursor.execute("SELECT COUNT(*) FROM transactions WHERE plan_id = ?", (plan_id_used_val,))
     assert cursor.fetchone()[0] == 1, "Transaction linking to the used plan was unexpectedly deleted or altered."
 
 
@@ -1420,7 +1469,8 @@ def _setup_member_and_plan_for_transaction_tests(db_conn, member_phone_suffix="T
     # Add a member
     member_name = f"Test Member {member_phone_suffix}"
     member_phone = f"MEMBER{member_phone_suffix}"
-    add_member_to_db(member_name, member_phone) # Using existing function
+    success_add_member, message_add_member = add_member_to_db(member_name, member_phone) # Using existing function
+    assert success_add_member is True, f"Failed to add member. Message: {message_add_member}"
     cursor.execute("SELECT member_id FROM members WHERE phone = ?", (member_phone,))
     member_id_row = cursor.fetchone()
     assert member_id_row is not None, "Failed to create member for transaction test."
@@ -1444,7 +1494,7 @@ def test_add_transaction_when_books_closed(db_conn):
 
     assert set_book_status(month_key_closed, "closed") is True, "Failed to close books for the test."
 
-    success, message = add_transaction(
+    add_txn_success, add_txn_message = add_transaction(
         transaction_type='Group Class',
         member_id=member_id,
         plan_id=plan_id,
@@ -1454,10 +1504,10 @@ def test_add_transaction_when_books_closed(db_conn):
         payment_method="Cash"
     )
 
-    assert success is False, "add_transaction should have failed due to closed books."
+    assert add_txn_success is False, "add_transaction should have failed due to closed books."
     expected_message = f"Cannot add transaction. Books for {month_key_closed} are closed."
     # Check if the returned message starts with the expected string, as it might have suffixes from DB manager.
-    assert message.startswith(expected_message), f"Expected message '{expected_message}', got '{message}'"
+    assert add_txn_message.startswith(expected_message), f"Expected message '{expected_message}', got '{add_txn_message}'"
 
 
     # Verify no transaction was added
@@ -1475,7 +1525,7 @@ def test_delete_transaction_when_books_closed(db_conn):
     payment_date_in_closed_month = "2024-08-10"
 
     # Add a transaction first
-    add_success, _ = add_transaction(
+    add_txn_success, add_txn_message = add_transaction(
         transaction_type='Group Class',
         member_id=member_id,
         plan_id=plan_id,
@@ -1484,7 +1534,7 @@ def test_delete_transaction_when_books_closed(db_conn):
         amount_paid=120.00,
         payment_method="Card"
     )
-    assert add_success is True, "Failed to add initial transaction for the test."
+    assert add_txn_success is True, f"Failed to add initial transaction for the test. Message: {add_txn_message}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT transaction_id FROM transactions WHERE member_id = ? AND payment_date = ?",
@@ -1519,7 +1569,7 @@ def test_add_transaction_when_books_open(db_conn):
     # Ensure books are open (either by default or explicitly setting)
     assert set_book_status(month_key_open, "open") is True
 
-    success, message = add_transaction(
+    add_txn_success, add_txn_message = add_transaction(
         transaction_type='Group Class',
         member_id=member_id,
         plan_id=plan_id,
@@ -1529,7 +1579,7 @@ def test_add_transaction_when_books_open(db_conn):
         payment_method="Cash"
     )
 
-    assert success is True, f"add_transaction should succeed when books are open. Message: {message}"
+    assert add_txn_success is True, f"add_transaction should succeed when books are open. Message: {add_txn_message}"
     # The exact success message might vary, but a general check for "success" or similar could be done.
     # For now, checking boolean True is the primary concern.
     # assert "Transaction added successfully" in message # Example if checking message content
@@ -1549,7 +1599,7 @@ def test_delete_transaction_when_books_open(db_conn):
     payment_date_in_open_month = "2024-10-10"
 
     # Add a transaction first
-    add_success, _ = add_transaction(
+    add_txn_success, add_txn_message = add_transaction(
         transaction_type='Group Class',
         member_id=member_id,
         plan_id=plan_id,
@@ -1558,7 +1608,7 @@ def test_delete_transaction_when_books_open(db_conn):
         amount_paid=130.00,
         payment_method="Online"
     )
-    assert add_success is True, "Failed to add initial transaction for the test."
+    assert add_txn_success is True, f"Failed to add initial transaction for the test. Message: {add_txn_message}"
 
     cursor = db_conn.cursor()
     cursor.execute("SELECT transaction_id FROM transactions WHERE member_id = ? AND payment_date = ?",
